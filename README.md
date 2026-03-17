@@ -1,48 +1,107 @@
-# JaldiQ ⏳📱
-**Digitizing Local Queues for a Wait-Free Experience**
+# JaldiQ ⏳📱  
+## Digitizing Local Queues for a Wait-Free Experience
 
-![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
-![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=for-the-badge&logo=kotlin&logoColor=white)
-![Jetpack Compose](https://img.shields.io/badge/Compose-4285F4?style=for-the-badge&logo=android&logoColor=white)
-![NodeJS](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
-![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
+![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=for-the-badge&logo=kotlin&logoColor=white) ![Jetpack Compose](https://img.shields.io/badge/Compose-4285F4?style=for-the-badge&logo=android&logoColor=white) ![NodeJS](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white) ![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
 
-[cite_start]JaldiQ is a local service queue manager that takes the pain out of waiting[cite: 37]. [cite_start]Instead of standing in long, tiring lines, customers can join a virtual queue from their phone and wait wherever they are comfortable[cite: 38]. 
+---
 
-[cite_start]Whether it's a local barber, a busy clinic, or a repair center, JaldiQ provides a universal, single-app solution to manage crowds and give people their valuable time back[cite: 15, 39, 40].
+## 📌 Overview
+**JaldiQ** is a local service queue manager that eliminates the pain of waiting in long physical lines.  
+
+Instead of standing in queues, customers can join a **virtual queue directly from their phone** and wait comfortably anywhere.  
+
+Whether it's a **barber shop, clinic, or repair center**, JaldiQ provides a **universal solution** to manage crowds efficiently and save time.
 
 ---
 
 ## 🛑 The Problem
-Traditional queuing is broken:
-* [cite_start]**Physical Exhaustion:** People stand for hours in lines at clinics, salons, and repair shops[cite: 5].
-* [cite_start]**Time Anxiety:** Customers don't know if the wait is 10 minutes or 1 hour[cite: 6].
-* [cite_start]**Fear of Leaving:** Step away for a moment, and you lose your spot[cite: 7].
-* [cite_start]**Shopkeeper Stress:** Owners are constantly distracted by people asking, "When is my turn?"[cite: 8].
-* [cite_start]**Blind Visits:** Traveling to a shop only to find it overcrowded wastes time[cite: 9].
+Traditional queuing systems have several major issues:
 
-## ✨ Key Features
-
-### For Customers 🧑‍🤝‍🧑
-* [cite_start]**Smart Virtual Tokens:** Instead of a paper slip, get a digital token showing exactly how many people are ahead of you and your estimated wait time[cite: 11].
-* [cite_start]**Remote Queuing:** Join the line from home or while doing other errands[cite: 14].
-* [cite_start]**Busy-Time Indicator:** A traffic-light system (Green, Yellow, Red) shows current crowd levels before you even leave home[cite: 25].
-* **One Token Rule & Leave Queue:** Fair queueing logic ensures one active token per person, with the flexibility to cancel if plans change.
-
-### For Shop Owners 🏪
-* **Low-Tech Dashboard:** Designed for non-technical owners. [cite_start]Manage the queue with massive, simple buttons: **Next**, **Pause**, and **Close**[cite: 12].
-* [cite_start]**No Extra Hardware:** No printers or tablets needed—it runs completely on a standard Android phone[cite: 13].
-* **Real-Time Customer List:** See exactly who is waiting in line with an instantly updating dashboard.
-
-### Smart System Features 🧠
-* **Missed-Turn Protection (Grace Window):** If a user is stuck in traffic, they aren't immediately canceled. [cite_start]The system creates a "Grace Window" allowing them to claim a slightly delayed spot[cite: 26].
-* **WhatsApp/SMS Updates (Upcoming):** Critical for elderly users who don't want to use an app. [cite_start]They receive simple text updates (e.g., "2 people left")[cite: 27].
+- **Physical Exhaustion:** Standing in long queues is tiring, especially in clinics or crowded places  
+- **Time Uncertainty:** No idea whether the wait is 10 minutes or 1 hour  
+- **Fear of Losing Spot:** Leaving the queue means losing your turn  
+- **Shopkeeper Distraction:** Constant interruptions with “When is my turn?”  
+- **Wasted Trips:** Visiting a shop only to find it overcrowded  
 
 ---
 
-## 🛠️ Technology Stack
-* [cite_start]**Frontend:** Native Android using **Kotlin** & **Jetpack Compose** for a modern, reactive UI[cite: 32].
-* **Architecture:** MVVM (Model-View-ViewModel) + Clean Architecture + Hilt (Dependency Injection).
-* [cite_start]**Backend:** **Node.js / Express** for handling complex queue logic, cron jobs, and webhooks[cite: 33].
-* [cite_start]**Database:** **Firebase Realtime Database** for instant, millisecond-latency status updates across all devices[cite: 34].
-* **Authentication:** Firebase Auth (Role-based: Customers vs. Shop Owners).
+## ✨ Key Features
+
+### 👥 For Customers
+- **Smart Virtual Tokens**  
+  Get a digital token showing people ahead and estimated wait time  
+
+- **Remote Queuing**  
+  Join queues from anywhere—home, office, or while traveling  
+
+- **Busy-Time Indicator**  
+  Traffic-light system:  
+  - 🟢 Green → Low crowd  
+  - 🟡 Yellow → Moderate  
+  - 🔴 Red → High crowd  
+
+- **One Token Rule**  
+  Fair usage with one active token per user  
+
+- **Leave Queue Anytime**  
+  Cancel your token if plans change  
+
+---
+
+### 🏪 For Shop Owners
+- **Simple Dashboard**  
+  Easy-to-use buttons:  
+  - ▶️ Next  
+  - ⏸️ Pause  
+  - ❌ Close  
+
+- **No Extra Hardware Needed**  
+  Works on a standard Android phone  
+
+- **Live Queue Monitoring**  
+  Real-time list of customers waiting  
+
+---
+
+### 🧠 Smart System Features
+- **Missed-Turn Protection (Grace Window)**  
+  Users get a buffer time if they are slightly late  
+
+- **SMS / WhatsApp Updates (Upcoming)**  
+  Simple text alerts like:  
+  *“Only 2 people left before your turn”*  
+
+---
+
+## 🛠️ Tech Stack
+
+### 📱 Frontend
+- Kotlin  
+- Jetpack Compose  
+- MVVM Architecture  
+- Clean Architecture  
+- Hilt (Dependency Injection)
+
+### ⚙️ Backend
+- Node.js  
+- Express.js  
+
+### 🔥 Database
+- Firebase Realtime Database  
+
+### 🔐 Authentication
+- Firebase Auth  
+  - Role-based system (Customer / Shop Owner)
+
+---
+
+## 🚀 Future Enhancements
+- WhatsApp & SMS notifications  
+- Multi-shop support  
+- AI-based wait time prediction  
+- Analytics dashboard for shop owners  
+
+---
+
+## 💡 Vision
+To make **waiting obsolete** by digitizing queues and giving people control over their time.
