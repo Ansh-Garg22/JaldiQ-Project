@@ -1,0 +1,9 @@
+# Backend dependencies
+node_modules/
+
+# Environment variables (contains secrets)
+.env
+.env.example
+
+# Firebase service account key (contains secrets)
+serviceAccountKey.json
