@@ -153,6 +153,151 @@ class ShopRepository @Inject constructor(
         }
 
     /**
+     * Mark the currently serving customer as DONE (COMPLETED).
+     * Increments the analytics counter and auto-skips to the next WAITING token.
+     */
+    suspend fun markDone(shopId: String): Result<Unit> =
+        completeCurrentToken(shopId, Token.STATUS_COMPLETED, incrementAnalytics = true)
+
+    /**
+     * Mark the currently serving customer as MISSED (no-show).
+     * Does NOT increment analytics. Auto-skips to the next WAITING token.
+     */
+    suspend fun markMissed(shopId: String): Result<Unit> =
+        completeCurrentToken(shopId, Token.STATUS_MISSED, incrementAnalytics = false)
+
+    /**
+     * Pulls the next available WAITING customer from the queue.
+     * Used when the owner is idle (currentServingNumber = 0 or pointing to completed person)
+     * but the queue is not empty.
+     */
+    suspend fun callNextCustomer(shopId: String): Result<Unit> =
+        suspendCancellableCoroutine { continuation ->
+            shopRef(shopId).runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val status = currentData.child("status").getValue(String::class.java) ?: "CLOSED"
+                    if (status == Shop.STATUS_CLOSED) return Transaction.abort()
+
+                    val queueData = currentData.child("queue")
+                    val currentServing = currentData.child("currentServingNumber").getValue(Int::class.java) ?: 0
+
+                    val activeStatuses = setOf(Token.STATUS_WAITING, Token.STATUS_GRACE_PERIOD)
+                    var nextTokenNumber: Int? = null
+
+                    for (tokenSnapshot in queueData.children) {
+                        val tokenNumber = tokenSnapshot.child("number").getValue(Int::class.java) ?: 0
+                        val tokenStatus = tokenSnapshot.child("status").getValue(String::class.java) ?: ""
+
+                        if (tokenStatus in activeStatuses && (currentServing == 0 || tokenNumber > currentServing)) {
+                            if (nextTokenNumber == null || tokenNumber < nextTokenNumber) {
+                                nextTokenNumber = tokenNumber
+                            }
+                        }
+                    }
+
+                    if (nextTokenNumber != null) {
+                        currentData.child("currentServingNumber").value = nextTokenNumber
+                    }
+
+                    return Transaction.success(currentData)
+                }
+
+                override fun onComplete(
+                    error: DatabaseError?,
+                    committed: Boolean,
+                    currentData: DataSnapshot?
+                ) {
+                    if (continuation.isActive) {
+                        when {
+                            error != null -> continuation.resume(Result.failure(error.toException()))
+                            !committed -> continuation.resume(
+                                Result.failure(IllegalStateException("Shop closed"))
+                            )
+                            else -> continuation.resume(Result.success(Unit))
+                        }
+                    }
+                }
+            })
+        }
+
+    /**
+     * Shared transaction logic for Done/Missed.
+     * Marks the current token with [newStatus] and finds the next WAITING token.
+     */
+    private suspend fun completeCurrentToken(
+        shopId: String,
+        newStatus: String,
+        incrementAnalytics: Boolean
+    ): Result<Unit> =
+        suspendCancellableCoroutine { continuation ->
+            shopRef(shopId).runTransaction(object : Transaction.Handler {
+                override fun doTransaction(currentData: MutableData): Transaction.Result {
+                    val currentServing =
+                        currentData.child("currentServingNumber").getValue(Int::class.java) ?: 0
+                    val status =
+                        currentData.child("status").getValue(String::class.java) ?: "CLOSED"
+
+                    if (status == Shop.STATUS_CLOSED) return Transaction.abort()
+
+                    val queueData = currentData.child("queue")
+
+                    // Mark the currently-serving token with the new status
+                    for (tokenSnapshot in queueData.children) {
+                        val tokenNumber =
+                            tokenSnapshot.child("number").getValue(Int::class.java) ?: 0
+                        if (tokenNumber == currentServing) {
+                            tokenSnapshot.child("status").value = newStatus
+                            break
+                        }
+                    }
+
+                    // Auto-skip: find the next WAITING token > currentServing
+                    val activeStatuses = setOf(Token.STATUS_WAITING, Token.STATUS_GRACE_PERIOD)
+                    var nextTokenNumber: Int? = null
+
+                    for (tokenSnapshot in queueData.children) {
+                        val tokenNumber =
+                            tokenSnapshot.child("number").getValue(Int::class.java) ?: 0
+                        val tokenStatus =
+                            tokenSnapshot.child("status").getValue(String::class.java) ?: ""
+
+                        if (tokenStatus in activeStatuses && tokenNumber > currentServing) {
+                            if (nextTokenNumber == null || tokenNumber < nextTokenNumber) {
+                                nextTokenNumber = tokenNumber
+                            }
+                        }
+                    }
+
+                    // Update currentServingNumber (0 if queue is empty)
+                    currentData.child("currentServingNumber").value = nextTokenNumber ?: 0
+
+                    return Transaction.success(currentData)
+                }
+
+                override fun onComplete(
+                    error: DatabaseError?,
+                    committed: Boolean,
+                    currentData: DataSnapshot?
+                ) {
+                    if (continuation.isActive) {
+                        when {
+                            error != null -> continuation.resume(Result.failure(error.toException()))
+                            !committed -> continuation.resume(
+                                Result.failure(IllegalStateException("Shop closed"))
+                            )
+                            else -> {
+                                if (incrementAnalytics) {
+                                    incrementDailyServedCount(shopId)
+                                }
+                                continuation.resume(Result.success(Unit))
+                            }
+                        }
+                    }
+                }
+            })
+        }
+
+    /**
      * Increment /analytics/{shopId}/{YYYY-MM-DD}/customersServed by 1.
      * Called after a token is successfully marked COMPLETED.
      */
@@ -420,7 +565,7 @@ class ShopRepository @Inject constructor(
      *
      * Returns the generated tokenId on success.
      */
-    suspend fun joinQueue(shopId: String, userId: String, userName: String = ""): Result<String> =
+    suspend fun joinQueue(shopId: String, userId: String, userName: String = "", notifyThreshold: Int = 2): Result<String> =
         suspendCancellableCoroutine { continuation ->
             val tokenId = "token_${System.currentTimeMillis()}"
 
@@ -455,6 +600,7 @@ class ShopRepository @Inject constructor(
                     tokenData.child("userId").value = userId
                     tokenData.child("userName").value = userName
                     tokenData.child("status").value = Token.STATUS_WAITING
+                    tokenData.child("notifyThreshold").value = notifyThreshold
 
                     return Transaction.success(currentData)
                 }

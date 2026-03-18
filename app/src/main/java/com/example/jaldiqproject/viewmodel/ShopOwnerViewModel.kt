@@ -82,15 +82,40 @@ class ShopOwnerViewModel @Inject constructor(
     }
 
     /**
-     * Skip the current person — sets their token to GRACE_PERIOD
-     * and advances the queue to the next person.
+     * Mark the currently serving customer as DONE (completed + analytics).
      */
-    fun onSkipClicked() {
+    fun onDoneClicked() {
         viewModelScope.launch {
             _actionError.value = null
-            val result = repository.skipToken(shopId)
+            val result = repository.markDone(shopId)
             result.onFailure { error ->
-                _actionError.value = error.message ?: "Failed to skip"
+                _actionError.value = error.message ?: "Failed to mark done"
+            }
+        }
+    }
+
+    /**
+     * Mark the currently serving customer as MISSED (no analytics increment).
+     */
+    fun onMissedClicked() {
+        viewModelScope.launch {
+            _actionError.value = null
+            val result = repository.markMissed(shopId)
+            result.onFailure { error ->
+                _actionError.value = error.message ?: "Failed to mark missed"
+            }
+        }
+    }
+
+    /**
+     * Pull the next available waiting customer when the shop is currently idle.
+     */
+    fun onCallNextClicked() {
+        viewModelScope.launch {
+            _actionError.value = null
+            val result = repository.callNextCustomer(shopId)
+            result.onFailure { error ->
+                _actionError.value = error.message ?: "Failed to call next customer"
             }
         }
     }

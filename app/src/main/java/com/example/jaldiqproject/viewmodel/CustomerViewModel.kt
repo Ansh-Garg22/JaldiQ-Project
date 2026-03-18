@@ -125,7 +125,7 @@ class CustomerViewModel @Inject constructor(
      * Uses Firebase transaction to atomically create a token.
      * Passes userName for shop owner display.
      */
-    fun joinQueue(shopId: String, shopName: String) {
+    fun joinQueue(shopId: String, shopName: String, notifyThreshold: Int = 2) {
         viewModelScope.launch {
             _tokenState.value = TokenUiState.Joining(shopName)
             _actionError.value = null
@@ -133,7 +133,7 @@ class CustomerViewModel @Inject constructor(
             // Use email prefix as display name (or could be a dedicated field)
             val displayName = userEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
 
-            val result = repository.joinQueue(shopId, userId, displayName)
+            val result = repository.joinQueue(shopId, userId, displayName, notifyThreshold)
             result.fold(
                 onSuccess = { tokenId ->
                     // Start observing the token for reactive updates

@@ -19,13 +19,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -123,8 +124,9 @@ fun ShopOwnerDashboardScreen(
                 is ShopUiState.Success -> {
                     DashboardContent(
                         shop = state.shop,
-                        onNextClicked = viewModel::onNextClicked,
-                        onSkipClicked = viewModel::onSkipClicked,
+                        onDoneClicked = viewModel::onDoneClicked,
+                        onMissedClicked = viewModel::onMissedClicked,
+                        onCallNextClicked = viewModel::onCallNextClicked,
                         onPauseClicked = viewModel::onPauseClicked,
                         onCloseClicked = viewModel::onCloseClicked,
                         onOpenShopClicked = viewModel::onOpenShopClicked
@@ -138,8 +140,9 @@ fun ShopOwnerDashboardScreen(
 @Composable
 private fun DashboardContent(
     shop: Shop,
-    onNextClicked: () -> Unit,
-    onSkipClicked: () -> Unit,
+    onDoneClicked: () -> Unit,
+    onMissedClicked: () -> Unit,
+    onCallNextClicked: () -> Unit,
     onPauseClicked: () -> Unit,
     onCloseClicked: () -> Unit,
     onOpenShopClicked: () -> Unit
@@ -147,10 +150,22 @@ private fun DashboardContent(
     val activeTokens = shop.queue.values.count { it.status == "WAITING" || it.status == "SERVING" }
     val isClosed = shop.status == Shop.STATUS_CLOSED
 
-    // Sort queue tokens by number for display
+    // Sort queue tokens by number for display — exclude completed, cancelled, and missed
     val sortedQueue = shop.queue.entries
         .sortedBy { it.value.number }
-        .filter { it.value.status != Token.STATUS_COMPLETED && it.value.status != Token.STATUS_CANCELLED }
+        .filter {
+            it.value.status != Token.STATUS_COMPLETED &&
+            it.value.status != Token.STATUS_CANCELLED &&
+            it.value.status != Token.STATUS_MISSED
+        }
+
+    // Find the currently serving token's details
+    val currentlyServing = if (shop.currentServingNumber > 0) {
+        shop.queue.values.find { it.number == shop.currentServingNumber && it.status != Token.STATUS_COMPLETED && it.status != Token.STATUS_MISSED && it.status != Token.STATUS_CANCELLED }
+    } else null
+
+    // Determine if anyone is waiting in the active queue
+    val hasWaitingCustomers = shop.queue.values.any { it.status == Token.STATUS_WAITING || it.status == Token.STATUS_GRACE_PERIOD }
 
     Column(
         modifier = Modifier
@@ -161,23 +176,31 @@ private fun DashboardContent(
         // ─── Header: Shop Name + Status ─────────────────────────
         ShopHeader(name = shop.name, status = shop.status)
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (isClosed) {
             // ─── CLOSED: Show "Open Shop" UI ────────────────────
             ClosedShopContent(onOpenShopClicked = onOpenShopClicked)
         } else {
-            // ─── OPEN / PAUSED: Show operational UI ─────────────
-            NowServingCard(servingNumber = shop.currentServingNumber)
+            // ─── Currently Serving Card ──────────────────────────
+            CurrentlyServingCard(
+                servingNumber = shop.currentServingNumber,
+                customerName = currentlyServing?.userName,
+                hasCustomer = currentlyServing != null,
+                hasWaitingCustomers = hasWaitingCustomers,
+                onDoneClicked = onDoneClicked,
+                onMissedClicked = onMissedClicked,
+                onCallNextClicked = onCallNextClicked
+            )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             StatsRow(
                 queueLength = activeTokens,
                 lastNumberIssued = shop.lastNumberIssued
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // ─── Real-Time Queue List ───────────────────────────
             Text(
@@ -223,11 +246,9 @@ private fun DashboardContent(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ─── Action Buttons ────────────────────────────────
+            // ─── Action Buttons (Pause / Close) ──────────
             ActionButtons(
                 shopStatus = shop.status,
-                onNextClicked = onNextClicked,
-                onSkipClicked = onSkipClicked,
                 onPauseClicked = onPauseClicked,
                 onCloseClicked = onCloseClicked
             )
@@ -373,8 +394,19 @@ private fun ShopHeader(name: String, status: String) {
     }
 }
 
+/**
+ * Currently Serving Card — supports 3 Idle/Active States.
+ */
 @Composable
-private fun NowServingCard(servingNumber: Int) {
+private fun CurrentlyServingCard(
+    servingNumber: Int,
+    customerName: String?,
+    hasCustomer: Boolean,
+    hasWaitingCustomers: Boolean,
+    onDoneClicked: () -> Unit,
+    onMissedClicked: () -> Unit,
+    onCallNextClicked: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -386,23 +418,127 @@ private fun NowServingCard(servingNumber: Int) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 32.dp),
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "NOW SERVING",
-                style = MaterialTheme.typography.titleLarge,
+                text = if (hasCustomer) "NOW SERVING" else "QUEUE STATUS",
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                 letterSpacing = 4.sp
             )
+
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "#$servingNumber",
-                fontSize = 96.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onPrimary,
-                textAlign = TextAlign.Center
-            )
+
+            if (hasCustomer) {
+                // ── State A: Actively Serving ──
+                Text(
+                    text = "#$servingNumber",
+                    fontSize = 64.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = customerName?.ifEmpty { "Customer" } ?: "Customer",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // ✅ Done
+                    Button(
+                        onClick = onDoneClicked,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = QueueGreen,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Done", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // ❌ Missed
+                    Button(
+                        onClick = onMissedClicked,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = QueueRed,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Missed", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else if (hasWaitingCustomers) {
+                // ── State B: Idle, but queue has people ──
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Customers are waiting",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onCallNextClicked,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = QueueGreen,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Call Next Customer", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                // ── State C: Completely Empty ──
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Waiting for new customers",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "to join the queue...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
         }
     }
 }
@@ -464,11 +600,13 @@ private fun StatCard(
     }
 }
 
+/**
+ * Bottom action bar: Pause/Resume, Close.
+ * Skip is removed as it was replaced by Done/Missed.
+ */
 @Composable
 private fun ActionButtons(
     shopStatus: String,
-    onNextClicked: () -> Unit,
-    onSkipClicked: () -> Unit,
     onPauseClicked: () -> Unit,
     onCloseClicked: () -> Unit
 ) {
@@ -476,68 +614,19 @@ private fun ActionButtons(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ── NEXT + SKIP: Only shown when OPEN (not PAUSED) ───
-        if (!isPaused) {
-            Button(
-                onClick = onNextClicked,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = QueueGreen,
-                    contentColor = Color.White
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = null,
-                    modifier = Modifier.size(36.dp)
-                )
-                Text(
-                    text = "  NEXT",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-
-            Button(
-                onClick = onSkipClicked,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = QueueYellow.copy(alpha = 0.85f),
-                    contentColor = Color.White
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PersonOff,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
-                Text(
-                    text = "  SKIP (15 min grace)",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // ── PAUSE / RESUME Button ─────────────────────────
+            // ── PAUSE / RESUME ────────────────────────────────
             Button(
                 onClick = onPauseClicked,
                 modifier = Modifier
                     .weight(1f)
-                    .height(64.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = QueueYellow,
                     contentColor = Color.White
@@ -546,22 +635,22 @@ private fun ActionButtons(
                 Icon(
                     imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(22.dp)
                 )
                 Text(
                     text = if (isPaused) " RESUME" else " PAUSE",
-                    fontSize = 18.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            // ── CLOSE Button ──────────────────────────────────
+            // ── CLOSE ─────────────────────────────────────────
             Button(
                 onClick = onCloseClicked,
                 modifier = Modifier
                     .weight(1f)
-                    .height(64.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = QueueRed,
                     contentColor = Color.White
@@ -570,11 +659,11 @@ private fun ActionButtons(
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(22.dp)
                 )
                 Text(
                     text = " CLOSE",
-                    fontSize = 18.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
             }

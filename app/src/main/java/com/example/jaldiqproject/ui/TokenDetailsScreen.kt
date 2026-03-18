@@ -153,10 +153,17 @@ private fun ActiveTokenContent(
     info: TokenWithShopInfo,
     onLeaveQueue: () -> Unit
 ) {
-    val isCompleted = info.token.status == Token.STATUS_COMPLETED
-    val isCancelled = info.token.status == Token.STATUS_CANCELLED
-    val isYourTurn = info.peopleAhead == 0 && !isCompleted && !isCancelled
-    val canLeave = info.token.status == Token.STATUS_WAITING && !isYourTurn
+    val isCompleted = info.token.status == com.example.jaldiqproject.model.Token.STATUS_COMPLETED
+    val isCancelled = info.token.status == com.example.jaldiqproject.model.Token.STATUS_CANCELLED
+    
+    // State C: Currently Serving (Owner has called you)
+    val isYourTurn = info.token.number == info.currentServingNumber && !isCompleted && !isCancelled
+    
+    // State B: Next in line (You are #1, but owner is idle and hasn't called you)
+    val isNextInLine = info.token.number > info.currentServingNumber && info.peopleAhead == 0 && !isCompleted && !isCancelled
+    
+    // Can only leave if not already at the counter being served
+    val canLeave = info.token.status == com.example.jaldiqproject.model.Token.STATUS_WAITING && !isYourTurn
 
     Column(
         modifier = Modifier
@@ -181,6 +188,7 @@ private fun ActiveTokenContent(
                 containerColor = when {
                     isCancelled -> QueueRed
                     isYourTurn -> QueueGreen
+                    isNextInLine -> QueueYellow // Indicate 'Get Ready'
                     isCompleted -> MaterialTheme.colorScheme.surfaceVariant
                     else -> MaterialTheme.colorScheme.primary
                 }
@@ -214,11 +222,21 @@ private fun ActiveTokenContent(
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
+                
+                // Active State Banners
                 when {
                     isYourTurn -> Text(
-                        text = "🎉 IT'S YOUR TURN!",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = "🎉 IT'S YOUR TURN!\nPlease proceed to the counter.",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    isNextInLine -> Text(
+                        text = "You are next!\nPlease wait to be called.",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                     isCompleted -> Text(

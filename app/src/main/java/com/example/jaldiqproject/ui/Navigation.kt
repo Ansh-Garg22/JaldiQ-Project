@@ -23,6 +23,7 @@ import javax.inject.Inject
  * Navigation routes for JaldiQ.
  */
 object Routes {
+    const val SPLASH = "splash"
     const val AUTH = "auth"
     const val REGISTER_SHOP = "register_shop"
     const val SHOP_OWNER_DASHBOARD = "shop_owner_dashboard/{shopId}"
@@ -48,8 +49,33 @@ fun JaldiQNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = Routes.AUTH
+        startDestination = Routes.SPLASH
     ) {
+        // ─── Splash Screen ────────────────────────────────────
+        composable(Routes.SPLASH) {
+            SplashScreen(
+                onSplashFinished = {
+                    val currentState = authViewModel.authState.value
+                    val destination = when (currentState) {
+                        is AuthUiState.Authenticated -> {
+                            when {
+                                currentState.role == User.ROLE_SHOP_OWNER && currentState.shopId.isNullOrEmpty() ->
+                                    Routes.REGISTER_SHOP
+                                currentState.role == User.ROLE_SHOP_OWNER && !currentState.shopId.isNullOrEmpty() ->
+                                    Routes.shopOwnerDashboard(currentState.shopId)
+                                else -> Routes.SHOP_DISCOVERY
+                            }
+                        }
+                        else -> Routes.AUTH
+                    }
+                    navController.navigate(destination) {
+                        popUpTo(Routes.SPLASH) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
         // ─── Auth Screen ─────────────────────────────────────
         composable(Routes.AUTH) {
             when (val state = authState) {

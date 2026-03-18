@@ -27,21 +27,27 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +77,12 @@ fun ShopDiscoveryScreen(
     val tokenState by viewModel.tokenState.collectAsState()
     val actionError by viewModel.actionError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Notification threshold dialog state
+    var showNotifyDialog by remember { mutableStateOf(false) }
+    var pendingShopId by remember { mutableStateOf("") }
+    var pendingShopName by remember { mutableStateOf("") }
+    var notifySliderValue by remember { mutableFloatStateOf(2f) }
 
     // Navigate to token details when token is obtained
     LaunchedEffect(Unit) {
@@ -174,7 +186,13 @@ fun ShopDiscoveryScreen(
                                     shop = shop,
                                     isJoining = isJoining,
                                     hasActiveToken = hasActiveToken,
-                                    onJoinClicked = { viewModel.joinQueue(shopId, shop.name) },
+                                    onJoinClicked = {
+                                        // Show notification preference dialog
+                                        pendingShopId = shopId
+                                        pendingShopName = shop.name
+                                        notifySliderValue = 2f
+                                        showNotifyDialog = true
+                                    },
                                     onViewActiveToken = {
                                         if (activeTokenId != null) {
                                             onViewActiveToken(shopId, activeTokenId)
@@ -188,6 +206,59 @@ fun ShopDiscoveryScreen(
             }
         }
     }
+
+    // ─── Notification Threshold Dialog ─────────────────────────
+    if (showNotifyDialog) {
+        AlertDialog(
+            onDismissRequest = { showNotifyDialog = false },
+            title = {
+                Text(
+                    text = "When should we notify you?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Alert me when ${notifySliderValue.toInt()} ${if (notifySliderValue.toInt() == 1) "person is" else "people are"} ahead",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Slider(
+                        value = notifySliderValue,
+                        onValueChange = { notifySliderValue = it },
+                        valueRange = 1f..5f,
+                        steps = 3
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("1", style = MaterialTheme.typography.labelSmall)
+                        Text("2", style = MaterialTheme.typography.labelSmall)
+                        Text("3", style = MaterialTheme.typography.labelSmall)
+                        Text("4", style = MaterialTheme.typography.labelSmall)
+                        Text("5", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showNotifyDialog = false
+                        viewModel.joinQueue(pendingShopId, pendingShopName, notifySliderValue.toInt())
+                    }
+                ) {
+                    Text("Join Queue", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNotifyDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -199,7 +270,11 @@ private fun ShopCard(
     onJoinClicked: () -> Unit,
     onViewActiveToken: () -> Unit
 ) {
-    val activeQueueLength = shop.lastNumberIssued - shop.currentServingNumber
+    // Phase 11 Fix: Actively count WAITING + GRACE_PERIOD tokens instead of subtracting
+    val activeQueueLength = shop.queue.values.count { 
+        it.status == com.example.jaldiqproject.model.Token.STATUS_WAITING || 
+        it.status == com.example.jaldiqproject.model.Token.STATUS_GRACE_PERIOD 
+    }
     val isOpen = shop.status == Shop.STATUS_OPEN
     val statusColor = when (shop.status) {
         Shop.STATUS_OPEN -> QueueGreen

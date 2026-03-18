@@ -193,12 +193,13 @@ function attachShopListener(shopId) {
           if (token.status !== "WAITING") continue;
 
           const peopleAhead = token.number - currentServing;
+          const tokenThreshold = token.notifyThreshold || 2;
 
-          if (peopleAhead === 2) {
+          if (peopleAhead === tokenThreshold) {
             await sendNotification(
               token.userId,
               "Almost Your Turn! 🔔",
-              `Only 2 people ahead at ${shop.name}. Get ready!`,
+              `Only ${tokenThreshold} ${tokenThreshold === 1 ? "person" : "people"} ahead at ${shop.name}. Get ready!`,
               "almost_turn"
             );
           } else if (peopleAhead === 0) {
