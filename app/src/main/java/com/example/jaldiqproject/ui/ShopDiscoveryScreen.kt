@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -113,92 +114,123 @@ fun ShopDiscoveryScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (val state = shopListState) {
-                is ShopListUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(modifier = Modifier.size(48.dp))
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Discovering nearby shops...",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                            )
+            // ─── Pincode Search Bar ─────────────────────────────────
+            val currentPincode by viewModel.currentPincode.collectAsState()
+            var searchPincode by remember(currentPincode) { mutableStateOf(currentPincode) }
+
+            androidx.compose.material3.OutlinedTextField(
+                value = searchPincode,
+                onValueChange = { searchPincode = it.take(6) },
+                placeholder = { Text("Current Area Pincode") },
+                leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = "Area") },
+                trailingIcon = {
+                    if (searchPincode != currentPincode && searchPincode.length >= 4) {
+                        IconButton(onClick = { viewModel.setAreaPincode(searchPincode) }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
                         }
                     }
-                }
+                },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(12.dp)
+            )
 
-                is ShopListUiState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "⚠️ ${state.message}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
-                        )
+            // ─── Main Content Area ───────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                when (val state = shopListState) {
+                    is ShopListUiState.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "Discovering nearby shops...",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
                     }
-                }
 
-                is ShopListUiState.Success -> {
-                    val isJoining = tokenState is TokenUiState.Joining
-
-                    if (state.shops.isEmpty()) {
+                    is ShopListUiState.Error -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "No shops available right now.",
+                                text = "⚠️ ${state.message}",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
                             )
                         }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(state.shops.entries.toList()) { (shopId, shop) ->
-                                val hasActiveToken = viewModel.hasActiveTokenInShop(shop)
-                                val activeTokenId = viewModel.findActiveTokenId(shop)
+                    }
 
-                                ShopCard(
-                                    shopId = shopId,
-                                    shop = shop,
-                                    isJoining = isJoining,
-                                    hasActiveToken = hasActiveToken,
-                                    onJoinClicked = {
-                                        // Show notification preference dialog
-                                        pendingShopId = shopId
-                                        pendingShopName = shop.name
-                                        notifySliderValue = 2f
-                                        showNotifyDialog = true
-                                    },
-                                    onViewActiveToken = {
-                                        if (activeTokenId != null) {
-                                            onViewActiveToken(shopId, activeTokenId)
-                                        }
-                                    }
+                    is ShopListUiState.Success -> {
+                        val isJoining = tokenState is TokenUiState.Joining
+
+                        if (state.shops.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "No shops available right now.",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                                 )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(state.shops.entries.toList()) { (shopId, shop) ->
+                                    val hasActiveToken = viewModel.hasActiveTokenInShop(shop)
+                                    val activeTokenId = viewModel.findActiveTokenId(shop)
+
+                                    ShopCard(
+                                        shopId = shopId,
+                                        shop = shop,
+                                        isJoining = isJoining,
+                                        hasActiveToken = hasActiveToken,
+                                        onJoinClicked = {
+                                            pendingShopId = shopId
+                                            pendingShopName = shop.name
+                                            notifySliderValue = 2f
+                                            showNotifyDialog = true
+                                        },
+                                        onViewActiveToken = {
+                                            if (activeTokenId != null) {
+                                                onViewActiveToken(shopId, activeTokenId)
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

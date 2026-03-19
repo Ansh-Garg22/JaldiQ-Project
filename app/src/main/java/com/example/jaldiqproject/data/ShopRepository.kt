@@ -528,9 +528,24 @@ class ShopRepository @Inject constructor(
     // ─── Phase 3: Customer Operations ────────────────────────────
 
     /**
-     * Observe all shops in real-time for the discovery screen.
+     * Get the customer's default pincode from their profile.
      */
-    fun observeAllShops(): Flow<Result<Map<String, Shop>>> = callbackFlow {
+    suspend fun getUserPincode(userId: String): Result<String> =
+        suspendCancellableCoroutine { continuation ->
+            userRef(userId).child("pincode").get()
+                .addOnSuccessListener { snapshot ->
+                    val pincode = snapshot.getValue(String::class.java) ?: ""
+                    if (continuation.isActive) continuation.resume(Result.success(pincode))
+                }
+                .addOnFailureListener { error ->
+                    if (continuation.isActive) continuation.resume(Result.failure(error))
+                }
+        }
+
+    /**
+     * Observe shops filtered by pincode in real-time for the discovery screen.
+     */
+    fun observeShopsByPincode(pincode: String): Flow<Result<Map<String, Shop>>> = callbackFlow {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
@@ -550,9 +565,9 @@ class ShopRepository @Inject constructor(
             }
         }
 
-        val ref = shopsRef()
-        ref.addValueEventListener(listener)
-        awaitClose { ref.removeEventListener(listener) }
+        val query = shopsRef().orderByChild("pincode").equalTo(pincode)
+        query.addValueEventListener(listener)
+        awaitClose { query.removeEventListener(listener) }
     }
 
     /**
@@ -744,7 +759,8 @@ class ShopRepository @Inject constructor(
         return Shop(
             name = snapshot.child("name").getValue(String::class.java) ?: "",
             ownerUid = snapshot.child("ownerUid").getValue(String::class.java) ?: "",
-            location = snapshot.child("location").getValue(String::class.java) ?: "",
+            ownerName = snapshot.child("ownerName").getValue(String::class.java) ?: "",
+            pincode = snapshot.child("pincode").getValue(String::class.java) ?: "",
             status = snapshot.child("status").getValue(String::class.java) ?: "CLOSED",
             currentServingNumber = snapshot.child("currentServingNumber").getValue(Int::class.java)
                 ?: 0,

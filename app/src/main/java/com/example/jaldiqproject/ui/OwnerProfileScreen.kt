@@ -67,7 +67,7 @@ fun OwnerProfileScreen(
     var ownerName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var shopName by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
+    var pincode by remember { mutableStateOf("") }
     var avgServiceTime by remember { mutableStateOf("15") }
     var isEditing by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
@@ -85,7 +85,7 @@ fun OwnerProfileScreen(
             val shopSnap = FirebaseDatabase.getInstance()
                 .getReference("shops/$shopId").get().await()
             shopName = shopSnap.child("name").getValue(String::class.java) ?: ""
-            location = shopSnap.child("location").getValue(String::class.java) ?: ""
+            pincode = shopSnap.child("pincode").getValue(String::class.java) ?: ""
             avgServiceTime = (shopSnap.child("averageServiceTimeMinutes")
                 .getValue(Int::class.java) ?: 15).toString()
         } catch (_: Exception) {}
@@ -191,12 +191,13 @@ fun OwnerProfileScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Location
+                // Pincode
                 OutlinedTextField(
-                    value = location,
-                    onValueChange = { if (isEditing) location = it },
-                    label = { Text("Location / Address") },
+                    value = pincode,
+                    onValueChange = { if (isEditing) pincode = it.filter { ch -> ch.isDigit() }.take(6) },
+                    label = { Text("Area Pincode") },
                     leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -228,7 +229,8 @@ fun OwnerProfileScreen(
                                 isSaving = true
                                 // Update user profile
                                 val userUpdates = mapOf<String, Any>(
-                                    "displayName" to ownerName.trim()
+                                    "displayName" to ownerName.trim(),
+                                    "pincode" to pincode.trim()
                                 )
                                 authRepository.updateUserProfile(uid, userUpdates)
 
@@ -236,7 +238,7 @@ fun OwnerProfileScreen(
                                 val shopUpdates = mapOf<String, Any>(
                                     "name" to shopName.trim(),
                                     "ownerName" to ownerName.trim(),
-                                    "location" to location.trim(),
+                                    "pincode" to pincode.trim(),
                                     "averageServiceTimeMinutes" to
                                             (avgServiceTime.toIntOrNull() ?: 15)
                                 )

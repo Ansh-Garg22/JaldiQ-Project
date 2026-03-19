@@ -66,10 +66,14 @@ class CustomerViewModel @Inject constructor(
     private val _navigateToToken = MutableSharedFlow<Pair<String, String>>()
     val navigateToToken = _navigateToToken.asSharedFlow()
 
+    private val _currentPincode = MutableStateFlow("")
+    val currentPincode: StateFlow<String> = _currentPincode.asStateFlow()
+
+    private var shopListJob: Job? = null
     private var tokenObserverJob: Job? = null
 
     init {
-        observeShops()
+        loadDefaultPincode()
         registerFcmToken()
     }
 
@@ -78,20 +82,39 @@ class CustomerViewModel @Inject constructor(
      */
     private fun registerFcmToken() {
         if (userId.isEmpty()) return
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            Log.d("JaldiQ-FCM", "FCM token registered for user $userId")
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            android.util.Log.d("JaldiQ-FCM", "FCM token registered for user $userId")
             repository.registerFcmToken(userId, token)
         }.addOnFailureListener { e ->
-            Log.e("JaldiQ-FCM", "Failed to get FCM token", e)
+            android.util.Log.e("JaldiQ-FCM", "Failed to get FCM token", e)
         }
     }
 
     /**
-     * Observe all shops in real-time for the discovery screen.
+     * Fetch the user's saved pincode and initialize the shop list for that area.
      */
-    private fun observeShops() {
+    private fun loadDefaultPincode() {
+        if (userId.isEmpty()) return
         viewModelScope.launch {
-            repository.observeAllShops().collect { result ->
+            repository.getUserPincode(userId).onSuccess { pincode ->
+                if (pincode.isNotBlank()) {
+                    setAreaPincode(pincode)
+                } else {
+                    _shopListState.value = ShopListUiState.Success(emptyMap())
+                }
+            }
+        }
+    }
+
+    /**
+     * Change the currently viewed area and dynamically load its shops.
+     */
+    fun setAreaPincode(pincode: String) {
+        _currentPincode.value = pincode
+        shopListJob?.cancel()
+        _shopListState.value = ShopListUiState.Loading
+        shopListJob = viewModelScope.launch {
+            repository.observeShopsByPincode(pincode).collect { result ->
                 _shopListState.value = result.fold(
                     onSuccess = { shops -> ShopListUiState.Success(shops) },
                     onFailure = { error ->

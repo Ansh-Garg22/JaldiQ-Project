@@ -7,7 +7,8 @@ package com.example.jaldiqproject.model
 data class Shop(
     val name: String = "",
     val ownerUid: String = "",
-    val location: String = "",
+    val ownerName: String = "",
+    val pincode: String = "",
     val status: String = STATUS_CLOSED,
     val currentServingNumber: Int = 0,
     val lastNumberIssued: Int = 0,

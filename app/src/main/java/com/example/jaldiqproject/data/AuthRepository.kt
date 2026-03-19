@@ -49,16 +49,49 @@ class AuthRepository @Inject constructor(
      * @param name User's display name
      * @return The created FirebaseUser's UID
      */
-    suspend fun signUp(email: String, password: String, role: String, name: String): Result<String> {
+    suspend fun signUp(
+        email: String,
+        password: String,
+        role: String,
+        name: String,
+        pincode: String,
+        shopName: String? = null,
+        averageServiceTimeMinutes: Int? = null
+    ): Result<String> {
         return try {
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             val uid = result.user?.uid ?: throw IllegalStateException("User creation failed")
+
+            var generatedShopId: String = ""
+
+            if (role == User.ROLE_SHOP_OWNER) {
+                generatedShopId = "shop_${System.currentTimeMillis()}"
+                
+                val avgMins = averageServiceTimeMinutes ?: 15
+                val sName = shopName ?: "My Shop"
+                
+                val shopData = mapOf(
+                    "name" to sName,
+                    "ownerUid" to uid,
+                    "ownerName" to name,
+                    "pincode" to pincode,
+                    "status" to "CLOSED",
+                    "averageServiceTimeMinutes" to avgMins,
+                    "currentServingNumber" to 0,
+                    "lastNumberIssued" to 0
+                )
+                
+                // Create the shop
+                shopsRef().child(generatedShopId).setValue(shopData).await()
+            }
 
             // Write user profile to database
             val user = User(
                 role = role,
                 email = email,
-                displayName = name
+                displayName = name,
+                pincode = pincode,
+                shopId = generatedShopId
             )
             userRef(uid).setValue(user).await()
 
@@ -110,44 +143,6 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    /**
-     * Register a new shop for a shop owner.
-     * Creates the shop in /shops/{shopId} and links it to the user.
-     *
-     * @return The generated shopId
-     */
-    suspend fun registerShop(
-        ownerUid: String,
-        ownerName: String,
-        shopName: String,
-        location: String,
-        averageServiceTimeMinutes: Int
-    ): Result<String> {
-        return try {
-            val shopId = "shop_${System.currentTimeMillis()}"
-
-            val shopData = mapOf(
-                "name" to shopName,
-                "ownerUid" to ownerUid,
-                "ownerName" to ownerName,
-                "location" to location,
-                "status" to "CLOSED",
-                "averageServiceTimeMinutes" to averageServiceTimeMinutes,
-                "currentServingNumber" to 0,
-                "lastNumberIssued" to 0
-            )
-
-            // Create the shop
-            shopsRef().child(shopId).setValue(shopData).await()
-
-            // Link shop to user
-            userRef(ownerUid).child("shopId").setValue(shopId).await()
-
-            Result.success(shopId)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 
     /**
      * Get the full user profile from the database.

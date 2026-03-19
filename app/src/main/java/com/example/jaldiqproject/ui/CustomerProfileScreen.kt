@@ -59,6 +59,7 @@ fun CustomerProfileScreen(
 
     var displayName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
+    var pincode by remember { mutableStateOf("") }
     var isEditing by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
@@ -69,6 +70,7 @@ fun CustomerProfileScreen(
         result.onSuccess { user ->
             displayName = user.displayName
             email = user.email
+            pincode = user.pincode
         }
         isLoading = false
     }
@@ -146,6 +148,21 @@ fun CustomerProfileScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Pincode Field
+                OutlinedTextField(
+                    value = pincode,
+                    onValueChange = { if (isEditing) pincode = it.filter { ch -> ch.isDigit() }.take(6) },
+                    label = { Text("Pincode / Zipcode") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = isEditing && !isSaving
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 // Email (read-only)
                 OutlinedTextField(
                     value = email,
@@ -166,7 +183,10 @@ fun CustomerProfileScreen(
                         onClick = {
                             scope.launch {
                                 isSaving = true
-                                val updates = mapOf<String, Any>("displayName" to displayName.trim())
+                                val updates = mapOf<String, Any>(
+                                    "displayName" to displayName.trim(),
+                                    "pincode" to pincode.trim()
+                                )
                                 val result = authRepository.updateUserProfile(uid, updates)
                                 isSaving = false
                                 result.fold(

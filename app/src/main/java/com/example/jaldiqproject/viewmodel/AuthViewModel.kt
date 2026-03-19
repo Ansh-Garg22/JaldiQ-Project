@@ -70,21 +70,32 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * Sign up a new user with email, password, role, and name.
+     * Sign up a new user with email, password, role, name, and pincode.
+     * If they are a shop owner, also captures shopName and avg service time to create the shop atomicaly.
      */
-    fun signUp(email: String, password: String, role: String, name: String) {
+    fun signUp(
+        email: String,
+        password: String,
+        role: String,
+        name: String,
+        pincode: String,
+        shopName: String? = null,
+        averageServiceTimeMinutes: Int? = null
+    ) {
         viewModelScope.launch {
             _authState.value = AuthUiState.Loading
 
-            val result = authRepository.signUp(email, password, role, name)
+            val result = authRepository.signUp(
+                email = email,
+                password = password,
+                role = role,
+                name = name,
+                pincode = pincode,
+                shopName = shopName,
+                averageServiceTimeMinutes = averageServiceTimeMinutes
+            )
             result.fold(
-                onSuccess = { uid ->
-                    _authState.value = AuthUiState.Authenticated(
-                        uid = uid,
-                        role = role,
-                        shopId = null
-                    )
-                },
+                onSuccess = { uid -> loadUserProfile(uid) },
                 onFailure = { error ->
                     _authState.value = AuthUiState.Error(
                         error.message ?: "Sign up failed"
@@ -139,37 +150,6 @@ class AuthViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Register a new shop for a shop owner.
-     */
-    fun registerShop(ownerName: String, shopName: String, location: String, avgServiceTime: Int) {
-        val currentState = _authState.value
-        if (currentState !is AuthUiState.Authenticated) return
-
-        viewModelScope.launch {
-            _shopRegState.value = ShopRegState.Loading
-
-            val result = authRepository.registerShop(
-                ownerUid = currentState.uid,
-                ownerName = ownerName,
-                shopName = shopName,
-                location = location,
-                averageServiceTimeMinutes = avgServiceTime
-            )
-
-            result.fold(
-                onSuccess = { shopId ->
-                    _shopRegState.value = ShopRegState.Success(shopId)
-                    _authState.value = currentState.copy(shopId = shopId)
-                },
-                onFailure = { error ->
-                    _shopRegState.value = ShopRegState.Error(
-                        error.message ?: "Failed to register shop"
-                    )
-                }
-            )
-        }
-    }
 
     /**
      * Sign out the current user.

@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -64,6 +66,9 @@ fun AuthScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var selectedRole by remember { mutableStateOf(User.ROLE_CUSTOMER) }
     var fullName by remember { mutableStateOf("") }
+    var pincode by remember { mutableStateOf("") }
+    var shopName by remember { mutableStateOf("") }
+    var avgServiceTime by remember { mutableStateOf("15") }
 
     val isLoading = authState is AuthUiState.Loading
     val errorMessage = (authState as? AuthUiState.Error)?.message
@@ -71,7 +76,8 @@ fun AuthScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -175,13 +181,62 @@ fun AuthScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ─── Full Name Field (Sign Up only) ──────────────────
+        // ─── Role Selector (Sign Up only) ────────────────────
         AnimatedVisibility(visible = isSignUp) {
             Column {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "I am a...",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface 
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedRole == User.ROLE_CUSTOMER,
+                                onClick = { selectedRole = User.ROLE_CUSTOMER },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.primary
+                                ),
+                                enabled = !isLoading
+                            )
+                            Text(
+                                text = "Customer",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            RadioButton(
+                                selected = selectedRole == User.ROLE_SHOP_OWNER,
+                                onClick = { selectedRole = User.ROLE_SHOP_OWNER },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.primary
+                                ),
+                                enabled = !isLoading
+                            )
+                            Text(
+                                text = "Shop Owner",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Fields for both roles
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = { fullName = it },
-                    label = { Text("Full Name") },
+                    label = { Text(if (selectedRole == User.ROLE_SHOP_OWNER) "Owner Name" else "Full Name") },
                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -189,53 +244,41 @@ fun AuthScreen(
                     enabled = !isLoading
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-            }
-        }
-
-        // ─── Role Selector (Sign Up only) ────────────────────
-        AnimatedVisibility(visible = isSignUp) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                OutlinedTextField(
+                    value = pincode,
+                    onValueChange = { pincode = it.take(6) },
+                    label = { Text("Pincode / Zipcode") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading
                 )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "I am a...",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = selectedRole == User.ROLE_CUSTOMER,
-                            onClick = { selectedRole = User.ROLE_CUSTOMER },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = MaterialTheme.colorScheme.primary
-                            ),
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Fields only for shop owner
+                AnimatedVisibility(visible = selectedRole == User.ROLE_SHOP_OWNER) {
+                    Column {
+                        OutlinedTextField(
+                            value = shopName,
+                            onValueChange = { shopName = it },
+                            label = { Text("Shop Name") },
+                            leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = null) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
                             enabled = !isLoading
                         )
-                        Text(
-                            text = "Customer",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        RadioButton(
-                            selected = selectedRole == User.ROLE_SHOP_OWNER,
-                            onClick = { selectedRole = User.ROLE_SHOP_OWNER },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = MaterialTheme.colorScheme.primary
-                            ),
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = avgServiceTime,
+                            onValueChange = { avgServiceTime = it },
+                            label = { Text("Average Service Time (mins)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
                             enabled = !isLoading
-                        )
-                        Text(
-                            text = "Shop Owner",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 4.dp)
                         )
                     }
                 }
@@ -260,7 +303,16 @@ fun AuthScreen(
         Button(
             onClick = {
                 if (isSignUp) {
-                    viewModel.signUp(email.trim(), password, selectedRole, fullName.trim())
+                    val avgMins = avgServiceTime.toIntOrNull() ?: 15
+                    viewModel.signUp(
+                        email = email.trim(), 
+                        password = password, 
+                        role = selectedRole, 
+                        name = fullName.trim(),
+                        pincode = pincode.trim(),
+                        shopName = shopName.trim().takeIf { selectedRole == User.ROLE_SHOP_OWNER },
+                        averageServiceTimeMinutes = avgMins.takeIf { selectedRole == User.ROLE_SHOP_OWNER }
+                    )
                 } else {
                     viewModel.signIn(email.trim(), password)
                 }
@@ -270,7 +322,7 @@ fun AuthScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             enabled = !isLoading && email.isNotBlank() && password.length >= 6
-                    && (!isSignUp || fullName.isNotBlank()),
+                    && (!isSignUp || (fullName.isNotBlank() && pincode.length >= 4 && (selectedRole != User.ROLE_SHOP_OWNER || shopName.isNotBlank()))),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
             )

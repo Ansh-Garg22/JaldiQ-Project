@@ -25,7 +25,6 @@ import javax.inject.Inject
 object Routes {
     const val SPLASH = "splash"
     const val AUTH = "auth"
-    const val REGISTER_SHOP = "register_shop"
     const val SHOP_OWNER_DASHBOARD = "shop_owner_dashboard/{shopId}"
     const val SHOP_DISCOVERY = "shop_discovery"
     const val TOKEN_DETAILS = "token_details/{shopId}/{tokenId}"
@@ -59,10 +58,10 @@ fun JaldiQNavHost(
                     val destination = when (currentState) {
                         is AuthUiState.Authenticated -> {
                             when {
-                                currentState.role == User.ROLE_SHOP_OWNER && currentState.shopId.isNullOrEmpty() ->
-                                    Routes.REGISTER_SHOP
                                 currentState.role == User.ROLE_SHOP_OWNER && !currentState.shopId.isNullOrEmpty() ->
                                     Routes.shopOwnerDashboard(currentState.shopId)
+                                currentState.role == User.ROLE_SHOP_OWNER -> 
+                                    Routes.AUTH // fallback if corrupted profile
                                 else -> Routes.SHOP_DISCOVERY
                             }
                         }
@@ -81,10 +80,10 @@ fun JaldiQNavHost(
             when (val state = authState) {
                 is AuthUiState.Authenticated -> {
                     val route = when {
-                        state.role == User.ROLE_SHOP_OWNER && state.shopId.isNullOrEmpty() ->
-                            Routes.REGISTER_SHOP
                         state.role == User.ROLE_SHOP_OWNER && !state.shopId.isNullOrEmpty() ->
                             Routes.shopOwnerDashboard(state.shopId)
+                        state.role == User.ROLE_SHOP_OWNER -> 
+                            Routes.AUTH // fallback
                         else -> Routes.SHOP_DISCOVERY
                     }
                     LaunchedEffect(state) {
@@ -100,18 +99,6 @@ fun JaldiQNavHost(
             }
         }
 
-        // ─── Register Shop ───────────────────────────────────
-        composable(Routes.REGISTER_SHOP) {
-            RegisterShopScreen(
-                viewModel = authViewModel,
-                onShopRegistered = { shopId ->
-                    navController.navigate(Routes.shopOwnerDashboard(shopId)) {
-                        popUpTo(Routes.AUTH) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            )
-        }
 
         // ─── Shop Owner Dashboard ────────────────────────────
         composable(
